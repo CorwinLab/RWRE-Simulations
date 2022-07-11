@@ -13,27 +13,38 @@ import fileIO
 import json
 import time
 
+
 class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
     """
-    Create a class that iterates through the time of the CDF. Can also be used to
-    get the discrete variance.
+    Class to simulate cumulative distribution function of random walks
+    in random environments. This is a wrapper with helper functions
+    for the C++ class.
 
     Parameters
     ----------
+    beta : float
+        Value of beta for the beta distribution to draw random probabilities
+        from.
+
     tMax : int
         Maximum time that will be iterated to.
 
-    beta : float
-        Value of beta used in the recurrance relation.
-
     Attributes
     ----------
-    CDF : numpy array (dtype of np.quad)
-        The current recurrance vector Z_B(n, t). This is actually
-        Z_B(n, t) = 1 - CDF(n, t).
-
     time : int
         Current time of the system
+
+    beta : float
+        Value of beta for the beta distribution to draw random probabilities
+        from.
+
+    CDF : numpy array (dtype of np.quad)
+        The current recurrance vector Z_B(n, t) in the original Barraquand-Corwin paper.
+        This relates to the CDF of the system through the relation:
+        Z_B(n, t) = 1 - CDF(2*n + 2 - t, t).
+
+    tMax : int
+        Maximum time that can be iterated to. This sets the allocated size of the CDF.
 
     id : int
         System ID used to save the system state.
@@ -43,6 +54,9 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
 
     Methods
     -------
+    getxvals()
+        Returns positions of CDF using the relation: x = 2*n + 2 - t.
+
     setBetaSeed(seed)
         Set the random seed of the beta distribution.
 
@@ -52,11 +66,8 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
     evolveToTime(time)
         Evolve the system to a time.
 
-    saveState()
-        Saves the current state of the system to a file.
-
     evolveTimesteps(num)
-        Evolve the system forward a number of timesteps.
+        Evolve the system forwared a number of timesteps.
 
     findQuantile(quantile)
         Find the corresponding quantile position.
@@ -67,8 +78,14 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
     getGumbelVariance(nParticles)
         Get the gumbel variance from the CDF.
 
-    getGumbelVariancePDF(nParticles)
-        Get gumbel variance from the CDF by first calculating the PDF.
+    getProbandV(quantile)
+        Get the probability and velocity of a quantile.
+
+    saveState()
+        Saves the current state of the system to a file.
+
+    fromFiles(cdf_file, scalars_file)
+        Load a DiffusionTimeCDF object from saved files.
 
     evolveAndGetVariance(times, nParticles, file)
         Get the gumbel variance at specific times and save to file.
@@ -76,13 +93,16 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
     evolveAndSaveQuantile(times, quantiles, file)
         Evolve the system to specific times and save the quantiles at those times
         to a file.
+
+    evolveAndGetProbAndV(quantile, time, save_file)
+        Measure the probability and velocity of a quantile at different times.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._last_saved_time = time.process_time()  # seconds
-        self._save_interval = 3600 * 6  # Set to save occupancy every XX hours.
-        self.id = None  # Need to also get SLURM ID
+        self._save_interval = 3600 * 6  # Set to save occupancy every 6 hours.
+        self.id = None
         self.save_dir = "."
 
     def __str__(self):
@@ -140,13 +160,25 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
     def tMax(self, tMax):
         self.settMax(tMax)
 
+    def xvals(self):
+        """
+        Returns positions of CDF using the relation: x = 2*n + 2 - t.
+
+        Returns
+        -------
+        list :
+            Positions of the CDF.
+        """
+        return super().getxvals()
+
     def setBetaSeed(self, seed):
         """
-        Set the random seed of the beta distribution.
+        Set the random seed of the beta distribution. Primarily
+        for reproducability of results.
 
         Parameters
         ----------
-        seed : int(?)
+        seed : int
             Random seed to use.
         """
 
@@ -154,7 +186,9 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
 
     def iterateTimeStep(self):
         """
-        Evolve the recurrance relation zB forward one step in time.
+        Evolve the recurrance relation forward one step in time. Note this method
+        checks if the object has been save recently. If not, the state of the object
+        is saved in case the process is terminated early.
 
         Raises
         ------
@@ -179,7 +213,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
         Parameters
         ----------
         time : int
-            Time to iterate the system forward to
+            Time to iterate the system forward to.
         """
 
         while self.time < time:
@@ -205,7 +239,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
         Parameters
         ----------
         quantile : np.quad
-            Quantile to measure
+            Quantile to measure. Should be > 1.
 
         Returns
         -------
@@ -218,12 +252,12 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
     def findQuantiles(self, quantiles, descending=False):
         """
         Find the corresponding quantiles. Should be faster than a list compression
-        over findQuntile b/c it does it in one loop.
+        over findQuntile b/c it does it in one loop in C++.
 
         Parameters
         ----------
         quantiles : numpy array (dtype np.quad)
-            Nth quantiles to measure
+            Quantiles to measure. Should all be > 1.
 
         descending : bool
             Whether or not the incoming quantiles are in descending or ascending order.
@@ -232,7 +266,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
         Returns
         -------
         numpy array (dtype ints)
-            Position of Nth quantiles
+            Position of the quantiles.
         """
 
         if descending:
@@ -242,17 +276,9 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
             returnVals.reverse()
             return np.array(returnVals)
 
-    def findLowerQuantile(self, quantile):
-        """
-        Find a quantile in the lower part of the distribution.
-        Opposite the findQuantile method
-        """
-
-        return super().findLowerQuantile(quantile)
-
     def getGumbelVariance(self, nParticles):
         """
-        Get the gumbel variance from the CDF.
+        Get the gumbel variance from the CDF by sampling the CDF.
 
         Parameters
         ----------
@@ -262,7 +288,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
         Returns
         -------
         variance : np.quad
-            Variance for the number of particles
+            Sampling variance from the CDF.
         """
 
         return super().getGumbelVariance(nParticles)
@@ -274,8 +300,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
         Parameters
         ----------
         quantile : float or np.quad
-            Quantile to measure the velocity and probability for. The algorithm
-            looks for the position where the probability is greater than 1/quantile.
+            Quantile to measure the velocity and probability for.
 
         Returns
         -------
@@ -283,7 +308,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
             Probability at the position
 
         v : float
-            Velocity at the position. Should be between 0 and 1
+            Velocity at the position. Should be between 0 and 1.
         """
 
         return super().getProbandV(quantile)
@@ -363,14 +388,20 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
 
         file : str
             Destination to save the data to.
+
+        append : bool (False)
+            Whether or not to append to a file. Primarily whether to write the
+            header or not.
         """
-        # Need to make sure changing to "a" doesn't break when writing to an
-        # empty or non-existant file
         f = open(file, "a")
         writer = csv.writer(f)
 
         if not append:
-            header = ["time"] + [str(N) for N in nParticles] + ['var' + str(N) for N in nParticles]
+            header = (
+                ["time"]
+                + [str(N) for N in nParticles]
+                + ["var" + str(N) for N in nParticles]
+            )
             writer.writerow(header)
             f.flush()
 
@@ -399,10 +430,9 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
         file : str
             File to save the quantiles to.
 
-        Examples
-        --------
-        >>> r = Recurrance(beta=np.inf)
-        >>> r.evolveAndSaveQuantile([1, 5, 50], [5, 10], 'Data.txt')
+        append : bool (False)
+            Whether or not to append to a file. Primarily whether to write the
+            header or not.
         """
 
         f = open(file, "a")
@@ -426,7 +456,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
 
     def evolveAndGetProbAndV(self, quantile, time, save_file):
         """
-        Measure the probability of a quantile at different times.
+        Measure the probability and velocity of a quantile at different times.
 
         Parameters
         ----------
@@ -443,7 +473,7 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
 
         assert quantile >= 1
 
-        f = open(save_file, 'a')
+        f = open(save_file, "a")
         writer = csv.writer(f)
 
         header = ["time", "prob", "v"]
@@ -458,102 +488,3 @@ class DiffusionTimeCDF(diffusionCDF.DiffusionTimeCDF):
             f.flush()
 
         f.close()
-
-    def evolveAndSaveFirstPassage(self, quantile, distances, save_file):
-        """
-        Measure the first passage time of a quantile at various distances.
-        """
-
-        f = open(save_file, 'a')
-        writer = csv.writer(f)
-
-        header = ['Distance', 'Time']
-        writer.writerow(header)
-        f.flush()
-
-        idx = 0
-        while idx < len(distances):
-            self.iterateTimeStep()
-            upper_dist = self.findQuantile(quantile)
-            lower_dist = abs(self.findLowerQuantile(quantile))
-
-            if upper_dist >= distances[idx] or lower_dist >= distances[idx]:
-                row = [distances[idx], self.time]
-                writer.writerow(row)
-                f.flush()
-            idx += 1
-
-
-class DiffusionPositionCDF(diffusionCDF.DiffusionPositionCDF):
-    """
-    Class to iterate through the position of the CDF.
-    """
-
-    def __str__(self):
-        return f"DiffusionCDF(beta={self.beta}, time={self.position})"
-
-    def __repr__(self):
-        return self.__str__()
-
-    @property
-    def beta(self):
-        return self.getBeta()
-
-    @property
-    def CDF(self):
-        return self.getCDF()
-
-    @property
-    def tMax(self):
-        return self.gettMax()
-
-    @property
-    def setBetaSeed(self, seed):
-        super().setBetaSeed(seed)
-
-    @property
-    def position(self):
-        return self.getPosition()
-
-    @property
-    def quantilePositions(self):
-        return self.getQuantilesMeasurement()
-
-    @property
-    def quantiles(self):
-        return self.getQuantiles()
-
-    def stepPosition(self):
-        """
-        Move the system forward one step in the position.
-        """
-
-        if self.position == self.tMax:
-            raise ValueError("Cannot evolve the system to a position larger than tMax")
-
-        super().stepPosition()
-
-    def evolveToPosition(self, n):
-        """
-        Move the system forward to a specified position.
-
-        Parameters
-        ----------
-        n : int
-            Position to move the system forward to.
-        """
-
-        while self.position < n:
-            self.stepPosition()
-
-    def evolvePositions(self, num_positions):
-        """
-        Move the system forward a fixed number of positions.
-        """
-
-        for _ in range(num_positions):
-            self.stepPosition()
-
-if __name__ == '__main__':
-    r = DiffusionTimeCDF(1, tMax=10000)
-    r.evolveAndGetProbAndV(100, [10, 100, 1000], 'data.txt')

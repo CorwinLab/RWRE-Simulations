@@ -25,14 +25,12 @@ private:
   double smallCutoff = pow(2, 31) - 2;
   double largeCutoff = 1e64;
 
-  // It would be nice if this could be a generic distribution as:
-  // boost::random::distribution bias
+  // Set up random number generators
   boost::random::beta_distribution<>::param_type betaParams;
 
   std::random_device rd;
   boost::random::mt19937_64 gen;
 
-  // std::uniform_real_distribution<> dis(0.0, 1.0);
   std::uniform_real_distribution<> dis;
   boost::random::beta_distribution<> beta_dist;
   boost::random::binomial_distribution<> binomial;
@@ -99,8 +97,6 @@ public:
 
   double getLargeCutoff() { return largeCutoff; };
   void setLargeCutoff(const double _largeCutoff) { largeCutoff = _largeCutoff; };
-
-  // Functions that do things
 
   void iterateTimestep();
 

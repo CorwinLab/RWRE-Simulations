@@ -682,18 +682,22 @@ class DiffusionPDF(diffusionPDF.DiffusionPDF):
         """
 
         idx = 0
-        f = open(file, 'a')
+        f = open(file, "a")
         writer = csv.writer(f)
-        header = ['Distance', 'Time']
+        header = ["Distance", "Time"]
         writer.writerow(header)
         f.flush()
         while idx < len(positions):
             self.iterateTimestep()
             maxIdx = self.getMaxIdx()
             minIdx = self.getMinIdx()
-            maxPosition = 2*(maxIdx - self.currentTime / 2) # multiply by 2 since the theory is +/- 1 for each step
-            minPosition = 2*(minIdx - self.currentTime / 2)
-            if maxPosition >= positions[idx] or abs(minPosition) >= positions[idx]: # also want to check the minimum position
+            maxPosition = 2 * (
+                maxIdx - self.currentTime / 2
+            )  # multiply by 2 since the theory is +/- 1 for each step
+            minPosition = 2 * (minIdx - self.currentTime / 2)
+            if (
+                maxPosition >= positions[idx] or abs(minPosition) >= positions[idx]
+            ):  # also want to check the minimum position
                 row = [positions[idx], self.currentTime]
                 writer.writerow(row)
                 f.flush()
@@ -758,7 +762,8 @@ class DiffusionPDF(diffusionPDF.DiffusionPDF):
         print("Occupancy:", np.array(self.getOccupancy())[nonzeros])
         print("Prob: ", np.array(Ns) / self.getNParticles())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     d = DiffusionPDF(10, np.inf, 1000, ProbDistFlag=False)
-    d.evolveAndSaveFirstPassage([1, 2, 3], 'Times.txt')
+    d.evolveAndSaveFirstPassage([1, 2, 3], "Times.txt")
     print(np.loadtxt("Times.txt"))

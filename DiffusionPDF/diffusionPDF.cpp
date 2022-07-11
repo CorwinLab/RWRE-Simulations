@@ -337,34 +337,6 @@ RealType DiffusionPDF::getGumbelVariance(RealType maxParticle)
   return getGumbelVariancePDF(xvals, pdf, maxParticle, nParticles);
 }
 
-/*
-Trying to hackily get the PDF for the Einstein random walk. Doesn't look like
-it works very well b/c there are a lot of zeros in the PDF and it only sums
-to 0.5
-*/
-RealType getEinsteinPDF(unsigned long int n, unsigned long int k){
-  if (k==0){
-    return RealType( 1 / pow(2, n));
-  }
-  RealType product = 1;
-  unsigned long int multiples = floor(n / k);
-  unsigned long int remainder = n % k;
-  for (RealType i=1; i <= k; i++){
-    product *= (n + 1 - i) / i / pow(2, multiples);
-  }
-  product /= pow(2, remainder);
-  return product;
-}
-
-std::vector<RealType> getWholeEinsteinPDF(unsigned long int n){
-
-  std::vector<RealType> pdf(n+1);
-  for (unsigned long int i=0; i <= n; i++){
-    pdf.at(i) = getEinsteinPDF(n, i);
-  }
-  return pdf;
-}
-
 PYBIND11_MODULE(diffusionPDF, m)
 {
   m.doc() = "C++ diffusionPDF";
@@ -409,6 +381,4 @@ PYBIND11_MODULE(diffusionPDF, m)
       .def("VsAndPb", &DiffusionPDF::VsAndPb, py::arg("v"))
       .def("getGumbelVariance", &DiffusionPDF::getGumbelVariance, py::arg("nParticles"))
       .def("getCDF", &DiffusionPDF::getCDF);
-  m.def("getEinsteinPDF", &getEinsteinPDF);
-  m.def("getWholeEinsteinPDF", &getWholeEinsteinPDF);
 }

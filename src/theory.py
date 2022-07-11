@@ -19,71 +19,77 @@ TW_x2 = TW_var + TW_mean ** 2
 TW_mean_sq = TW_var + TW_mean ** 2
 
 EM_constant = 0.577
-KPZ_time = np.array([
-    25 / 100,
-    35 / 100,
-    50 / 100,
-    75 / 100,
-    12 / 10,
-    2,
-    35 / 10,
-    65 / 10,
-    13,
-    25,
-    50,
-    100,
-    250,
-    500,
-    1000,
-    2500,
-    5000,
-    10000,
-    20000,
-])
+KPZ_time = np.array(
+    [
+        25 / 100,
+        35 / 100,
+        50 / 100,
+        75 / 100,
+        12 / 10,
+        2,
+        35 / 10,
+        65 / 10,
+        13,
+        25,
+        50,
+        100,
+        250,
+        500,
+        1000,
+        2500,
+        5000,
+        10000,
+        20000,
+    ]
+)
 
-KPZ_var = np.array([
-    1.75713,
-    1.70908,
-    1.62923,
-    1.53633,
-    1.4361,
-    1.33806,
-    1.24323,
-    1.15268,
-    1.06801,
-    1.00314,
-    0.948845,
-    0.907622,
-    0.869637,
-    0.850573,
-    0.837569,
-    0.82681,
-    0.821864,
-    0.818774,
-    0.815189,
-])
+KPZ_var = np.array(
+    [
+        1.75713,
+        1.70908,
+        1.62923,
+        1.53633,
+        1.4361,
+        1.33806,
+        1.24323,
+        1.15268,
+        1.06801,
+        1.00314,
+        0.948845,
+        0.907622,
+        0.869637,
+        0.850573,
+        0.837569,
+        0.82681,
+        0.821864,
+        0.818774,
+        0.815189,
+    ]
+)
 
-KPZ_mean = np.array([
- -0.870678,
- -1.16141,
- -1.39703,
- -1.59726,
- -1.76062,
- -1.87532,
- -1.94673,
- -1.98074,
- -1.98402,
- -1.96854,
- -1.94339,
- -1.91601,
- -1.88247,
- -1.86097,
- -1.84308,
- -1.82444,
- -1.81353,
- -1.80477,
- -1.79884,
-])
+KPZ_mean = np.array(
+    [
+        -0.870678,
+        -1.16141,
+        -1.39703,
+        -1.59726,
+        -1.76062,
+        -1.87532,
+        -1.94673,
+        -1.98074,
+        -1.98402,
+        -1.96854,
+        -1.94339,
+        -1.91601,
+        -1.88247,
+        -1.86097,
+        -1.84308,
+        -1.82444,
+        -1.81353,
+        -1.80477,
+        -1.79884,
+    ]
+)
 
 
 def v0(N, time):
@@ -132,14 +138,23 @@ def second_order_mean(N, time):
     v0_val = v0(N, time)
     return time ** (1 / 3) * TW_mean * lambda_0(v0_val)
 
+
 def second_order_mean_written_out(N, t):
     logN = np.log(N).astype(float)
-    return t**(-1/3) * logN ** (2/3) * 2**(1/3) * (1 - logN/t)**(2/3) * 1.771 / np.sqrt(1-(1-logN/t)**2)
+    return (
+        t ** (-1 / 3)
+        * logN ** (2 / 3)
+        * 2 ** (1 / 3)
+        * (1 - logN / t) ** (2 / 3)
+        * 1.771
+        / np.sqrt(1 - (1 - logN / t) ** 2)
+    )
 
 
 def third_order_mean(N, time):
     v0_val = v0(N, time)
     return time ** (-1 / 3) * lambda_1(v0_val) * TW_mean_sq
+
 
 def quantileMean(N, time):
     """
@@ -164,7 +179,10 @@ def quantileMean(N, time):
     theory = np.piecewise(
         time,
         [time < logN, time >= logN],
-        [lambda t: t, lambda t: first_order_mean(N, t) - second_order_mean_written_out(N, t)], #+ second_order_mean(N, t)],
+        [
+            lambda t: t,
+            lambda t: first_order_mean(N, t) - second_order_mean_written_out(N, t),
+        ],  # + second_order_mean(N, t)],
     )
     return theory
 
@@ -204,9 +222,9 @@ def quantileVar(N, time, crossover=None, width=None):
     """
 
     if crossover is None:
-        crossover = np.log(N).astype(float) ** (3/2)
+        crossover = np.log(N).astype(float) ** (3 / 2)
     if width is None:
-        width = np.log(N).astype(float) ** (4/3)
+        width = np.log(N).astype(float) ** (4 / 3)
 
     logN = np.log(N).astype(float)
     theory = np.piecewise(
@@ -259,8 +277,9 @@ def quantileVarLongTime(N, time):
     """
 
     logN = np.log(N).astype(float)
-    that = time / logN**2
-    return logN * that / 2 * KPZ_var_fit(4/that)
+    that = time / logN ** 2
+    return logN * that / 2 * KPZ_var_fit(4 / that)
+
 
 def quantileMeanLongTime(N, time):
     """
@@ -268,8 +287,11 @@ def quantileMeanLongTime(N, time):
     """
 
     logN = np.log(N).astype(float)
-    that = time / logN**2
-    return (2 * time * logN)**(1/2) + np.sqrt(time / 2 / logN) * KPZ_mean_fit(4 / that)
+    that = time / logN ** 2
+    return (2 * time * logN) ** (1 / 2) + np.sqrt(time / 2 / logN) * KPZ_mean_fit(
+        4 / that
+    )
+
 
 def probMean(vs, t):
     """
@@ -340,6 +362,7 @@ def mu(n, c1):
         + 1 / (2 * nu_prime(c1)) * np.log((1 + c1) / (2 * np.pi * (1 - c1)))
     )
 
+
 def einstein_mean(N, t, c1):
     c = np.log(N) / t
     b = beta(c1)
@@ -350,33 +373,54 @@ def einstein_mean(N, t, c1):
 def einstein_var(N, c1):
     return beta(c1) ** 2 * np.pi ** 2 / 6
 
+
 def KPZ_var_theory(t):
-    return np.sqrt(np.pi/2) * (t/2)**(-1/6) + (1 + 5/4 * np.pi - 8*np.pi/3/np.sqrt(3))*(t/2)**(1/3)
+    return np.sqrt(np.pi / 2) * (t / 2) ** (-1 / 6) + (
+        1 + 5 / 4 * np.pi - 8 * np.pi / 3 / np.sqrt(3)
+    ) * (t / 2) ** (1 / 3)
+
 
 def KPZ_mean_theory(t):
-    return -np.sqrt(np.pi / 8) * (t/2)**(1/6) - (1/2 + 3/8 * np.pi - 8 *np.pi / 9 / np.sqrt(3)) * (t/2)**(2/3)
+    return -np.sqrt(np.pi / 8) * (t / 2) ** (1 / 6) - (
+        1 / 2 + 3 / 8 * np.pi - 8 * np.pi / 9 / np.sqrt(3)
+    ) * (t / 2) ** (2 / 3)
+
 
 def KPZ_var_fit(t):
-    f = interp1d(KPZ_time, KPZ_var, fill_value = KPZ_var[-1], bounds_error=False)
-    y = np.piecewise(t,
-                    [t <= 0.33, t > 0.33],
-                    [lambda time: KPZ_var_theory(time), lambda time: f(time)])
-    y = y * 2 **(-2/3) * t ** (2/3)
+    f = interp1d(KPZ_time, KPZ_var, fill_value=KPZ_var[-1], bounds_error=False)
+    y = np.piecewise(
+        t,
+        [t <= 0.33, t > 0.33],
+        [lambda time: KPZ_var_theory(time), lambda time: f(time)],
+    )
+    y = y * 2 ** (-2 / 3) * t ** (2 / 3)
     return y
 
+
 def KPZ_mean_fit(t):
-    f = interp1d(KPZ_time, KPZ_mean, fill_value = KPZ_mean[-1], bounds_error=False)
-    y = np.piecewise(t,
-                    [t <= 0.33, t > 0.33],
-                    [lambda time: KPZ_mean_theory(time), lambda time: f(time)])
-    y = y*2**(-1/3) * t ** (1/3) - t/24
+    f = interp1d(KPZ_time, KPZ_mean, fill_value=KPZ_mean[-1], bounds_error=False)
+    y = np.piecewise(
+        t,
+        [t <= 0.33, t > 0.33],
+        [lambda time: KPZ_mean_theory(time), lambda time: f(time)],
+    )
+    y = y * 2 ** (-1 / 3) * t ** (1 / 3) - t / 24
     return y
+
 
 def gumbel_var(t, N):
     logN = np.log(N).astype(float)
-    return np.piecewise(t,
-                        [t <= logN, t > logN],
-                        [lambda time: 0, lambda time: np.pi**2 / 6 * (time/logN-1)**2 / (2*time/logN-1)])
+    return np.piecewise(
+        t,
+        [t <= logN, t > logN],
+        [
+            lambda time: 0,
+            lambda time: np.pi ** 2
+            / 6
+            * (time / logN - 1) ** 2
+            / (2 * time / logN - 1),
+        ],
+    )
 
 
 def log_moving_average(time, data, N, window_size=10):
@@ -397,10 +441,11 @@ def log_moving_average(time, data, N, window_size=10):
 
     return np.array(new_times), np.array(mean_data)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     num = 100
-    times = np.geomspace(1, 10**3, num)
-    data = np.random.random(len(times)) * times **3
+    times = np.geomspace(1, 10 ** 3, num)
+    data = np.random.random(len(times)) * times ** 3
     fig, ax = plt.subplots()
     log_times, mean_data = log_moving_average(times, data, window_size=10)
     ax.scatter(times, data)
